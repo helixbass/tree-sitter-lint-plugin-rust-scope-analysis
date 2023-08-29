@@ -1,13 +1,15 @@
 use id_arena::Id;
 use tracing::trace;
-use tree_sitter_lint::{tree_sitter_grep::RopeOrSlice, tree_sitter::{Tree, Node}};
+use tree_sitter_lint::{tree_sitter_grep::RopeOrSlice, tree_sitter::Node};
+
+use crate::kind::SourceFile;
 
 use super::{scope::_Scope, arenas::AllArenas};
 
 pub struct ScopeAnalyzer<'a> {
     file_contents: RopeOrSlice<'a>,
     pub scopes: Vec<Id<_Scope<'a>>>,
-    arenas: AllArenas<'a>,
+    arena: AllArenas<'a>,
 }
 
 impl<'a> ScopeAnalyzer<'a> {
@@ -19,7 +21,7 @@ impl<'a> ScopeAnalyzer<'a> {
         Self {
             file_contents,
             scopes: Default::default(),
-            arenas: Default::default(),
+            arena: Default::default(),
         }
     }
 
@@ -27,6 +29,9 @@ impl<'a> ScopeAnalyzer<'a> {
         trace!(?node, "visiting node");
 
         match node.kind() {
+            SourceFile => {
+                self.scopes.push(_Scope::new_root(&mut self.arena.scopes));
+            }
             _ => self.visit_children(node),
         }
     }

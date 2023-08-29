@@ -4,6 +4,6 @@ use super::{scope::_Scope, definition::_Definition};
 
 #[derive(Default)]
 pub struct AllArenas<'a> {
-    scopes: Arena<_Scope<'a>>,
-    definitions: Arena<_Definition<'a>>,
+    pub scopes: Arena<_Scope<'a>>,
+    pub definitions: Arena<_Definition<'a>>,
 }

@@ -2,3 +2,4 @@
 
 mod file;
 mod helpers;
+mod r#struct;

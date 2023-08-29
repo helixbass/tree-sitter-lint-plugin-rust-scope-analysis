@@ -1,9 +1,14 @@
 use id_arena::{Arena, Id};
+use squalid::EverythingExt;
 use tree_sitter_lint::{
     tree_sitter::Node, tree_sitter_grep::SupportedLanguage, NodeExt, SourceTextProvider,
 };
 
-use crate::{kind::{Crate, Self_, Super}, path::SimplePath, ScopeAnalyzer};
+use crate::{
+    kind::{Crate, Self_, Super, VisibilityModifier},
+    path::SimplePath,
+    ScopeAnalyzer,
+};
 
 #[derive(Debug)]
 pub struct _Definition<'a> {
@@ -35,6 +40,8 @@ pub enum DefinitionKind {
     Struct,
     Module,
     Function,
+    ExternCrateDeclaration,
+    Use,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -73,6 +80,13 @@ impl<'a> Visibility<'a> {
             },
             _ => unreachable!(),
         }
+    }
+
+    pub fn from_item(node: Node<'a>, source_text_provider: &impl SourceTextProvider<'a>) -> Self {
+        node.first_non_comment_named_child(SupportedLanguage::Rust)
+            .when(|node| node.kind() == VisibilityModifier)
+            .map(|node| Self::from_visibility_modifier(node, source_text_provider))
+            .unwrap_or_default()
     }
 }
 

@@ -10,7 +10,10 @@ use tree_sitter_lint::{
 };
 
 use crate::{
-    kind::{SourceFile, StructItem, VisibilityModifier, ModItem, FunctionItem},
+    kind::{
+        ExternCrateDeclaration, FunctionItem, Identifier, ModItem, ScopedIdentifier, SourceFile,
+        StructItem, UseAsClause, UseDeclaration, UseList, VisibilityModifier, ScopedUseList, UseWildcard,
+    },
     scope_analysis::definition::{DefinitionKind, Visibility},
 };
 
@@ -57,66 +60,104 @@ impl<'a> ScopeAnalyzer<'a> {
                 self.visit_children(node);
             }
             StructItem => {
-                let visibility = node
-                    .first_non_comment_named_child(SupportedLanguage::Rust)
-                    .when(|node| node.kind() == VisibilityModifier)
-                    .map(|node| Visibility::from_visibility_modifier(node, self))
-                    .unwrap_or_default();
-                _Scope::define(
-                    self.current_scope_id(),
-                    &mut self.arena.scopes,
-                    &mut self.arena.definitions,
-                    &mut self.arena.variables,
-                    DefinitionKind::Struct,
-                    visibility,
-                    node.field("name"),
-                    node,
-                    &self.file_contents,
-                );
+                let visibility = Visibility::from_item(node, self);
+                self.define(DefinitionKind::Struct, visibility, node.field("name"), node);
 
                 self.visit_children(node);
             }
             ModItem => {
-                let visibility = node
-                    .first_non_comment_named_child(SupportedLanguage::Rust)
-                    .when(|node| node.kind() == VisibilityModifier)
-                    .map(|node| Visibility::from_visibility_modifier(node, self))
-                    .unwrap_or_default();
-                _Scope::define(
-                    self.current_scope_id(),
-                    &mut self.arena.scopes,
-                    &mut self.arena.definitions,
-                    &mut self.arena.variables,
-                    DefinitionKind::Module,
-                    visibility,
-                    node.field("name"),
-                    node,
-                    &self.file_contents,
-                );
+                let visibility = Visibility::from_item(node, self);
+                self.define(DefinitionKind::Module, visibility, node.field("name"), node);
 
                 self.visit_children(node);
             }
             FunctionItem => {
-                let visibility = node
-                    .first_non_comment_named_child(SupportedLanguage::Rust)
-                    .when(|node| node.kind() == VisibilityModifier)
-                    .map(|node| Visibility::from_visibility_modifier(node, self))
-                    .unwrap_or_default();
-                _Scope::define(
-                    self.current_scope_id(),
-                    &mut self.arena.scopes,
-                    &mut self.arena.definitions,
-                    &mut self.arena.variables,
+                let visibility = Visibility::from_item(node, self);
+                self.define(
                     DefinitionKind::Function,
                     visibility,
                     node.field("name"),
                     node,
-                    &self.file_contents,
                 );
 
                 self.visit_children(node);
             }
+            ExternCrateDeclaration => {
+                let visibility = Visibility::from_item(node, self);
+                self.define(
+                    DefinitionKind::ExternCrateDeclaration,
+                    visibility,
+                    node.child_by_field_name("alias")
+                        .unwrap_or_else(|| node.field("name")),
+                    node,
+                );
+
+                self.visit_children(node);
+            }
+            UseDeclaration => {
+                self.visit_use_declaration(node);
+            }
             _ => self.visit_children(node),
+        }
+    }
+
+    fn visit_use_declaration(&mut self, use_declaration: Node<'a>) {
+        let visibility = Visibility::from_item(use_declaration, self);
+        self.visit_use_clause(
+            visibility,
+            use_declaration,
+            use_declaration.field("argument"),
+        );
+    }
+
+    fn visit_use_clause(
+        &mut self,
+        visibility: Visibility<'a>,
+        use_declaration: Node<'a>,
+        use_clause: Node<'a>,
+    ) {
+        match use_clause.kind() {
+            Identifier => {
+                self.define(
+                    DefinitionKind::Use,
+                    visibility,
+                    use_clause,
+                    use_declaration,
+                );
+            }
+            ScopedIdentifier => {
+                self.define(
+                    DefinitionKind::Use,
+                    visibility,
+                    use_clause.field("name"),
+                    use_declaration,
+                );
+            }
+            UseAsClause => {
+                self.define(
+                    DefinitionKind::Use,
+                    visibility,
+                    use_clause.field("alias"),
+                    use_declaration,
+                );
+            }
+            UseList => {
+                use_clause
+                    .non_comment_named_children(SupportedLanguage::Rust)
+                    .for_each(|use_clause| {
+                        self.visit_use_clause(visibility.clone(), use_declaration, use_clause);
+                    });
+            }
+            ScopedUseList => {
+                use_clause
+                    .field("list")
+                    .non_comment_named_children(SupportedLanguage::Rust)
+                    .for_each(|use_clause| {
+                        self.visit_use_clause(visibility.clone(), use_declaration, use_clause);
+                    });
+            }
+            UseWildcard => (),
+            _ => unreachable!()
         }
     }
 
@@ -125,6 +166,26 @@ impl<'a> ScopeAnalyzer<'a> {
         for child in node.named_children(&mut cursor) {
             self.visit(child);
         }
+    }
+
+    fn define(
+        &mut self,
+        kind: DefinitionKind,
+        visibility: Visibility<'a>,
+        name: Node<'a>,
+        node: Node<'a>,
+    ) {
+        _Scope::define(
+            self.current_scope_id(),
+            &mut self.arena.scopes,
+            &mut self.arena.definitions,
+            &mut self.arena.variables,
+            kind,
+            visibility,
+            name,
+            node,
+            &self.file_contents,
+        );
     }
 
     pub(crate) fn borrow_scope<'b>(&'b self, scope: Id<_Scope<'a>>) -> Scope<'a, 'b> {

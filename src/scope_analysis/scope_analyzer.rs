@@ -10,7 +10,7 @@ use tree_sitter_lint::{
 };
 
 use crate::{
-    kind::{SourceFile, StructItem, VisibilityModifier},
+    kind::{SourceFile, StructItem, VisibilityModifier, ModItem, FunctionItem},
     scope_analysis::definition::{DefinitionKind, Visibility},
 };
 
@@ -68,6 +68,46 @@ impl<'a> ScopeAnalyzer<'a> {
                     &mut self.arena.definitions,
                     &mut self.arena.variables,
                     DefinitionKind::Struct,
+                    visibility,
+                    node.field("name"),
+                    node,
+                    &self.file_contents,
+                );
+
+                self.visit_children(node);
+            }
+            ModItem => {
+                let visibility = node
+                    .first_non_comment_named_child(SupportedLanguage::Rust)
+                    .when(|node| node.kind() == VisibilityModifier)
+                    .map(|node| Visibility::from_visibility_modifier(node, self))
+                    .unwrap_or_default();
+                _Scope::define(
+                    self.current_scope_id(),
+                    &mut self.arena.scopes,
+                    &mut self.arena.definitions,
+                    &mut self.arena.variables,
+                    DefinitionKind::Module,
+                    visibility,
+                    node.field("name"),
+                    node,
+                    &self.file_contents,
+                );
+
+                self.visit_children(node);
+            }
+            FunctionItem => {
+                let visibility = node
+                    .first_non_comment_named_child(SupportedLanguage::Rust)
+                    .when(|node| node.kind() == VisibilityModifier)
+                    .map(|node| Visibility::from_visibility_modifier(node, self))
+                    .unwrap_or_default();
+                _Scope::define(
+                    self.current_scope_id(),
+                    &mut self.arena.scopes,
+                    &mut self.arena.definitions,
+                    &mut self.arena.variables,
+                    DefinitionKind::Function,
                     visibility,
                     node.field("name"),
                     node,

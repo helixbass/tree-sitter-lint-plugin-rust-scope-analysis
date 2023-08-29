@@ -33,6 +33,8 @@ impl<'a> _Definition<'a> {
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum DefinitionKind {
     Struct,
+    Module,
+    Function,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]

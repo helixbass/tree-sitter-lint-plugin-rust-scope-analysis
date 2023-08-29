@@ -1,14 +1,25 @@
-use std::fmt;
+use std::{borrow::Cow, fmt, ops};
 
 use id_arena::Id;
 use tracing::trace;
-use tree_sitter_lint::{tree_sitter::Node, tree_sitter_grep::RopeOrSlice};
+use tree_sitter_lint::{
+    squalid::EverythingExt,
+    tree_sitter::Node,
+    tree_sitter_grep::{RopeOrSlice, SupportedLanguage},
+    NodeExt, SourceTextProvider,
+};
 
-use crate::kind::SourceFile;
+use crate::{
+    kind::{SourceFile, StructItem, VisibilityModifier},
+    scope_analysis::definition::{DefinitionKind, Visibility},
+};
 
 use super::{
     arenas::AllArenas,
-    scope::{Scope, _Scope}, variable::{Variable, _Variable}, reference::{Reference, _Reference}, definition::{_Definition, Definition},
+    definition::{Definition, _Definition},
+    reference::{Reference, _Reference},
+    scope::{Scope, _Scope},
+    variable::{Variable, _Variable},
 };
 
 pub struct ScopeAnalyzer<'a> {
@@ -28,12 +39,42 @@ impl<'a> ScopeAnalyzer<'a> {
         }
     }
 
+    fn current_scope_id(&self) -> Id<_Scope<'a>> {
+        *self.scopes.last().unwrap()
+    }
+
+    fn current_scope_mut(&mut self) -> &mut _Scope<'a> {
+        &mut self.arena.scopes[*self.scopes.last().unwrap()]
+    }
+
     pub fn visit(&mut self, node: Node<'a>) {
         trace!(?node, "visiting node");
 
         match node.kind() {
             SourceFile => {
                 self.scopes.push(_Scope::new_root(&mut self.arena.scopes));
+
+                self.visit_children(node);
+            }
+            StructItem => {
+                let visibility = node
+                    .first_non_comment_named_child(SupportedLanguage::Rust)
+                    .when(|node| node.kind() == VisibilityModifier)
+                    .map(|node| Visibility::from_visibility_modifier(node, self))
+                    .unwrap_or_default();
+                _Scope::define(
+                    self.current_scope_id(),
+                    &mut self.arena.scopes,
+                    &mut self.arena.definitions,
+                    &mut self.arena.variables,
+                    DefinitionKind::Struct,
+                    visibility,
+                    node.field("name"),
+                    node,
+                    &self.file_contents,
+                );
+
+                self.visit_children(node);
             }
             _ => self.visit_children(node),
         }
@@ -54,16 +95,32 @@ impl<'a> ScopeAnalyzer<'a> {
         Variable::new(&self.arena.variables[variable], self)
     }
 
-    pub(crate) fn borrow_reference<'b>(&'b self, reference: Id<_Reference<'a>>) -> Reference<'a, 'b> {
+    pub(crate) fn borrow_reference<'b>(
+        &'b self,
+        reference: Id<_Reference<'a>>,
+    ) -> Reference<'a, 'b> {
         Reference::new(&self.arena.references[reference], self)
     }
 
-    pub(crate) fn borrow_definition<'b>(&'b self, definition: Id<_Definition<'a>>) -> Definition<'a, 'b> {
+    pub(crate) fn borrow_definition<'b>(
+        &'b self,
+        definition: Id<_Definition<'a>>,
+    ) -> Definition<'a, 'b> {
         Definition::new(&self.arena.definitions[definition], self)
     }
 
     pub fn root_scope<'b>(&'b self) -> Scope<'a, 'b> {
         self.borrow_scope(self.scopes[0])
+    }
+}
+
+impl<'a> SourceTextProvider<'a> for ScopeAnalyzer<'a> {
+    fn node_text(&self, node: Node) -> Cow<'a, str> {
+        self.file_contents.node_text(node)
+    }
+
+    fn slice(&self, range: ops::Range<usize>) -> Cow<'a, str> {
+        self.file_contents.slice(range)
     }
 }
 

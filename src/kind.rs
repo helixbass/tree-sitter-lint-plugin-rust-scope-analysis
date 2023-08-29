@@ -1,1 +1,10 @@
+pub const BracketedType: &str = "bracketed_type";
+pub const Crate: &str = "crate";
+pub const GenericType: &str = "generic_type";
+pub const Metavariable: &str = "metavariable";
+pub const ScopedIdentifier: &str = "scoped_identifier";
+pub const Self_: &str = "self";
 pub const SourceFile: &str = "source_file";
+pub const StructItem: &str = "struct_item";
+pub const Super: &str = "super";
+pub const VisibilityModifier: &str = "visibility_modifier";

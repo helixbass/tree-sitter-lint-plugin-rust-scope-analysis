@@ -3,10 +3,14 @@
 use itertools::Itertools;
 use speculoos::prelude::*;
 
+use crate::tests::helpers::tracing_subscribe;
+
 use super::helpers::{get_scope_analyzer, parse};
 
 #[test]
 fn test_struct_definition_gets_added_to_scope() {
+    tracing_subscribe();
+
     let source_text = "
         struct Foo {}
     ";

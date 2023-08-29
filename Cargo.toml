@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 id-arena = "2.2.1"
 itertools = "0.11.0"
+squalid = { git = "https://github.com/helixbass/squalid", rev = "1db1aeb" }
 tracing = "0.1.37"
 tree-sitter-lint = { path = "../tree-sitter-lint" }
 
@@ -16,3 +17,4 @@ tree-sitter = { git = "https://github.com/tree-sitter/tree-sitter", rev = "c16b9
 
 [dev-dependencies]
 speculoos = "0.11.0"
+tracing-subscriber = "0.3.17"

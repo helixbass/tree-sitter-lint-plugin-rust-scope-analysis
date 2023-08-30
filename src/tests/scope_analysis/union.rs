@@ -4,7 +4,7 @@ use itertools::Itertools;
 use speculoos::prelude::*;
 
 use crate::{
-    kind::{TypeIdentifier, TypeItem, UnionItem},
+    kind::{TypeIdentifier, UnionItem},
     scope_analysis::DefinitionKind,
     tests::helpers::tracing_subscribe,
 };

@@ -11,22 +11,30 @@ pub struct _Reference<'a> {
     pub scope: Id<_Scope<'a>>,
     pub resolved: Option<Id<_Variable<'a>>>,
     pub id: Id<Self>,
+    pub usage_kind: UsageKind,
 }
 
 impl<'a> _Reference<'a> {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         arena: &mut Arena<Self>,
+        usage_kind: UsageKind,
         node: Node<'a>,
         scope: Id<_Scope<'a>>,
     ) -> Id<Self> {
         arena.alloc_with_id(|id| Self {
             node,
+            usage_kind,
             scope,
             resolved: Default::default(),
             id,
         })
     }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum UsageKind {
+    TypeReference,
 }
 
 #[derive(Debug)]

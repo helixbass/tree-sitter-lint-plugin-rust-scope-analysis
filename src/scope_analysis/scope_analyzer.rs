@@ -3,18 +3,17 @@ use std::{borrow::Cow, fmt, ops};
 use id_arena::Id;
 use tracing::trace;
 use tree_sitter_lint::{
-    squalid::EverythingExt,
     tree_sitter::Node,
     tree_sitter_grep::{RopeOrSlice, SupportedLanguage},
     NodeExt, SourceTextProvider,
 };
 
 use crate::{
-    ast_helpers::is_underscore,
+    ast_helpers::{is_simple_type_identifier, is_underscore},
     kind::{
-        ConstItem, EnumItem, ExternCrateDeclaration, FunctionItem, Identifier, ModItem,
-        ScopedIdentifier, ScopedUseList, SourceFile, StaticItem, StructItem, TraitItem, TypeItem,
-        UnionItem, UseAsClause, UseDeclaration, UseList, UseWildcard, VisibilityModifier, MacroDefinition,
+        ConstItem, EnumItem, ExternCrateDeclaration, FunctionItem, Identifier, MacroDefinition,
+        ModItem, ScopedIdentifier, ScopedUseList, SourceFile, StaticItem, StructItem, TraitItem,
+        TypeIdentifier, TypeItem, UnionItem, UseAsClause, UseDeclaration, UseList, UseWildcard,
     },
     scope_analysis::definition::{DefinitionKind, Visibility},
 };
@@ -22,15 +21,22 @@ use crate::{
 use super::{
     arenas::AllArenas,
     definition::{Definition, _Definition},
-    reference::{Reference, _Reference},
+    reference::{Reference, UsageKind, _Reference},
     scope::{Scope, _Scope},
     variable::{Variable, _Variable},
 };
+
+macro_rules! current_scope_mut {
+    ($self:ident) => {
+        &mut $self.arena.scopes[$self.current_scope.unwrap()]
+    };
+}
 
 pub struct ScopeAnalyzer<'a> {
     file_contents: RopeOrSlice<'a>,
     pub scopes: Vec<Id<_Scope<'a>>>,
     arena: AllArenas<'a>,
+    current_scope: Option<Id<_Scope<'a>>>,
 }
 
 impl<'a> ScopeAnalyzer<'a> {
@@ -41,15 +47,17 @@ impl<'a> ScopeAnalyzer<'a> {
             file_contents,
             scopes: Default::default(),
             arena: Default::default(),
+            current_scope: Default::default(),
         }
     }
 
     fn current_scope_id(&self) -> Id<_Scope<'a>> {
-        *self.scopes.last().unwrap()
+        self.current_scope.unwrap()
     }
 
+    #[allow(dead_code)]
     fn current_scope_mut(&mut self) -> &mut _Scope<'a> {
-        &mut self.arena.scopes[*self.scopes.last().unwrap()]
+        &mut self.arena.scopes[self.current_scope.unwrap()]
     }
 
     pub fn visit(&mut self, node: Node<'a>) {
@@ -57,21 +65,24 @@ impl<'a> ScopeAnalyzer<'a> {
 
         match node.kind() {
             SourceFile => {
-                self.scopes.push(_Scope::new_root(&mut self.arena.scopes));
+                let scope = _Scope::new_root(&mut self.arena.scopes);
+                self.enter_scope(scope);
 
                 self.visit_children(node);
+
+                self.close(scope);
             }
             StructItem => {
                 let visibility = Visibility::from_item(node, self);
                 self.define(DefinitionKind::Struct, visibility, node.field("name"), node);
 
-                self.visit_children(node);
+                self.visit_children_except_name(node);
             }
             ModItem => {
                 let visibility = Visibility::from_item(node, self);
                 self.define(DefinitionKind::Module, visibility, node.field("name"), node);
 
-                self.visit_children(node);
+                self.visit_children_except_name(node);
             }
             FunctionItem => {
                 let visibility = Visibility::from_item(node, self);
@@ -82,7 +93,7 @@ impl<'a> ScopeAnalyzer<'a> {
                     node,
                 );
 
-                self.visit_children(node);
+                self.visit_children_except_name(node);
             }
             ExternCrateDeclaration => {
                 let visibility = Visibility::from_item(node, self);
@@ -94,7 +105,7 @@ impl<'a> ScopeAnalyzer<'a> {
                     node,
                 );
 
-                self.visit_children(node);
+                self.visit_children_except_name(node);
             }
             UseDeclaration => {
                 self.visit_use_declaration(node);
@@ -108,37 +119,37 @@ impl<'a> ScopeAnalyzer<'a> {
                     node,
                 );
 
-                self.visit_children(node);
+                self.visit_children_except_name(node);
             }
             UnionItem => {
                 let visibility = Visibility::from_item(node, self);
                 self.define(DefinitionKind::Union, visibility, node.field("name"), node);
 
-                self.visit_children(node);
+                self.visit_children_except_name(node);
             }
             EnumItem => {
                 let visibility = Visibility::from_item(node, self);
                 self.define(DefinitionKind::Enum, visibility, node.field("name"), node);
 
-                self.visit_children(node);
+                self.visit_children_except_name(node);
             }
             ConstItem => {
                 let visibility = Visibility::from_item(node, self);
                 self.define(DefinitionKind::Const, visibility, node.field("name"), node);
 
-                self.visit_children(node);
+                self.visit_children_except_name(node);
             }
             StaticItem => {
                 let visibility = Visibility::from_item(node, self);
                 self.define(DefinitionKind::Static, visibility, node.field("name"), node);
 
-                self.visit_children(node);
+                self.visit_children_except_name(node);
             }
             TraitItem => {
                 let visibility = Visibility::from_item(node, self);
                 self.define(DefinitionKind::Trait, visibility, node.field("name"), node);
 
-                self.visit_children(node);
+                self.visit_children_except_name(node);
             }
             MacroDefinition => {
                 self.define(
@@ -149,7 +160,12 @@ impl<'a> ScopeAnalyzer<'a> {
                     node,
                 );
 
-                self.visit_children(node);
+                self.visit_children_except_name(node);
+            }
+            TypeIdentifier => {
+                if is_simple_type_identifier(node) {
+                    self.add_reference(get_usage_kind(node), node);
+                }
             }
             _ => self.visit_children(node),
         }
@@ -217,6 +233,14 @@ impl<'a> ScopeAnalyzer<'a> {
         }
     }
 
+    fn visit_children_except_name(&mut self, node: Node<'a>) {
+        node.non_comment_children_and_field_names(SupportedLanguage::Rust)
+            .filter(|(_, field_name)| *field_name != Some("name"))
+            .for_each(|(child, _)| {
+                self.visit(child);
+            });
+    }
+
     fn define(
         &mut self,
         kind: DefinitionKind,
@@ -238,6 +262,39 @@ impl<'a> ScopeAnalyzer<'a> {
             node,
             &self.file_contents,
         );
+    }
+
+    fn add_reference(&mut self, usage_kind: UsageKind, node: Node<'a>) {
+        current_scope_mut!(self).add_reference(&mut self.arena.references, usage_kind, node, &self.file_contents);
+    }
+
+    fn close(&mut self, scope: Id<_Scope<'a>>) {
+        loop {
+            let current_scope = self.current_scope_id();
+            let upper = self.arena.scopes[current_scope].maybe_upper();
+
+            trace!(scope = ?current_scope, "closing scope");
+
+            _Scope::close(
+                current_scope,
+                &mut self.arena.scopes,
+                &mut self.arena.references,
+                &self.arena.definitions,
+                &mut self.arena.variables,
+                &self.file_contents,
+            );
+            self.current_scope = upper;
+            if scope == current_scope {
+                return;
+            }
+        }
+    }
+
+    fn enter_scope(&mut self, scope: Id<_Scope<'a>>) {
+        trace!(?scope, "entering scope");
+
+        self.scopes.push(scope);
+        self.current_scope = Some(scope);
     }
 
     pub(crate) fn borrow_scope<'b>(&'b self, scope: Id<_Scope<'a>>) -> Scope<'a, 'b> {
@@ -285,4 +342,8 @@ impl<'a> fmt::Debug for ScopeAnalyzer<'a> {
             // .field("arena", &self.arena)
             .finish()
     }
+}
+
+fn get_usage_kind(_node: Node) -> UsageKind {
+    UsageKind::TypeReference
 }

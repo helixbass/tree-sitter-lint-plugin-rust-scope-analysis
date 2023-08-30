@@ -10,6 +10,7 @@ pub const MacroDefinition: &str = "macro_definition";
 pub const Metavariable: &str = "metavariable";
 pub const ModItem: &str = "mod_item";
 pub const ScopedIdentifier: &str = "scoped_identifier";
+pub const ScopedTypeIdentifier: &str = "scoped_type_identifier";
 pub const ScopedUseList: &str = "scoped_use_list";
 pub const Self_: &str = "self";
 pub const SourceFile: &str = "source_file";

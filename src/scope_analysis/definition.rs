@@ -16,6 +16,7 @@ pub struct _Definition<'a> {
     pub name: Node<'a>,
     pub node: Node<'a>,
     pub visibility: Visibility<'a>,
+    pub id: Id<Self>,
 }
 
 impl<'a> _Definition<'a> {
@@ -26,11 +27,12 @@ impl<'a> _Definition<'a> {
         node: Node<'a>,
         visibility: Visibility<'a>,
     ) -> Id<Self> {
-        arena.alloc(Self {
+        arena.alloc_with_id(|id| Self {
             kind,
             name,
             node,
             visibility,
+            id,
         })
     }
 }

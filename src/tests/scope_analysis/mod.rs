@@ -8,6 +8,7 @@ mod function;
 mod helpers;
 mod r#macro;
 mod module;
+mod references;
 mod r#static;
 mod r#struct;
 mod r#trait;

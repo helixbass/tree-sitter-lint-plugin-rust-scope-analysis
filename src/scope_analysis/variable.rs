@@ -11,7 +11,7 @@ pub struct _Variable<'a> {
     pub definition: Id<_Definition<'a>>,
     pub scope: Id<_Scope<'a>>,
     pub references: Vec<Id<_Reference<'a>>>,
-    id: Id<Self>,
+    pub id: Id<Self>,
 }
 
 impl<'a> _Variable<'a> {

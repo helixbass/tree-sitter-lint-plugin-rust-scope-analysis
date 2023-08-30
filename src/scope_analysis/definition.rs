@@ -51,6 +51,7 @@ pub enum DefinitionKind {
     Static,
     Trait,
     Macro,
+    Variable,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]

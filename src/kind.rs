@@ -6,6 +6,7 @@ pub const ExternCrateDeclaration: &str = "extern_crate_declaration";
 pub const FunctionItem: &str = "function_item";
 pub const GenericType: &str = "generic_type";
 pub const Identifier: &str = "identifier";
+pub const LetDeclaration: &str = "let_declaration";
 pub const MacroDefinition: &str = "macro_definition";
 pub const Metavariable: &str = "metavariable";
 pub const ModItem: &str = "mod_item";

@@ -35,6 +35,7 @@ impl<'a> _Reference<'a> {
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum UsageKind {
     TypeReference,
+    IdentifierReference,
 }
 
 #[derive(Debug)]
@@ -63,5 +64,9 @@ impl<'a, 'b> Reference<'a, 'b> {
 
     pub fn scope(&self) -> Scope<'a, 'b> {
         self.scope_analyzer.borrow_scope(self.reference.scope)
+    }
+
+    pub fn usage_kind(&self) -> UsageKind {
+        self.reference.usage_kind
     }
 }

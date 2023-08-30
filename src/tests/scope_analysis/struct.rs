@@ -3,7 +3,11 @@
 use itertools::Itertools;
 use speculoos::prelude::*;
 
-use crate::{tests::helpers::tracing_subscribe, scope_analysis::DefinitionKind, kind::{TypeIdentifier, StructItem}};
+use crate::{
+    kind::{StructItem, TypeIdentifier},
+    scope_analysis::{DefinitionKind, ScopeKind},
+    tests::helpers::tracing_subscribe,
+};
 
 use super::helpers::{get_scope_analyzer, parse};
 
@@ -15,13 +19,11 @@ fn test_struct_definition_gets_added_to_scope() {
         struct Foo {}
     ";
     let tree = parse(source_text);
-    let scope_analyzer = get_scope_analyzer(
-        source_text,
-        &tree
-    );
+    let scope_analyzer = get_scope_analyzer(source_text, &tree);
 
     let root_scope = scope_analyzer.root_scope();
 
+    assert_that!(&root_scope.kind()).is_equal_to(ScopeKind::Root);
     let variables = root_scope.variables().collect_vec();
     assert_that!(&variables).has_length(1);
     let variable = &variables[0];

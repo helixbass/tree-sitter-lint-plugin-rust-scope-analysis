@@ -9,11 +9,11 @@ use tree_sitter_lint::{
 };
 
 use crate::{
-    ast_helpers::{is_simple_type_identifier, is_underscore},
+    ast_helpers::{is_simple_type_identifier, is_underscore, is_simple_identifier},
     kind::{
         ConstItem, EnumItem, ExternCrateDeclaration, FunctionItem, Identifier, MacroDefinition,
         ModItem, ScopedIdentifier, ScopedUseList, SourceFile, StaticItem, StructItem, TraitItem,
-        TypeIdentifier, TypeItem, UnionItem, UseAsClause, UseDeclaration, UseList, UseWildcard,
+        TypeIdentifier, TypeItem, UnionItem, UseAsClause, UseDeclaration, UseList, UseWildcard, LetDeclaration,
     },
     scope_analysis::definition::{DefinitionKind, Visibility},
 };
@@ -37,6 +37,7 @@ pub struct ScopeAnalyzer<'a> {
     pub scopes: Vec<Id<_Scope<'a>>>,
     arena: AllArenas<'a>,
     current_scope: Option<Id<_Scope<'a>>>,
+    is_in_left_hand_side_of: Option<Node<'a>>,
 }
 
 impl<'a> ScopeAnalyzer<'a> {
@@ -48,11 +49,8 @@ impl<'a> ScopeAnalyzer<'a> {
             scopes: Default::default(),
             arena: Default::default(),
             current_scope: Default::default(),
+            is_in_left_hand_side_of: Default::default(),
         }
-    }
-
-    fn current_scope_id(&self) -> Id<_Scope<'a>> {
-        self.current_scope.unwrap()
     }
 
     #[allow(dead_code)]
@@ -65,7 +63,7 @@ impl<'a> ScopeAnalyzer<'a> {
 
         match node.kind() {
             SourceFile => {
-                let scope = _Scope::new_root(&mut self.arena.scopes);
+                let scope = _Scope::new_root(&mut self.arena.scopes, node);
                 self.enter_scope(scope);
 
                 self.visit_children(node);
@@ -93,7 +91,12 @@ impl<'a> ScopeAnalyzer<'a> {
                     node,
                 );
 
+                let scope = _Scope::new_function(&mut self.arena.scopes, node, self.current_scope.unwrap());
+                self.enter_scope(scope);
+
                 self.visit_children_except_name(node);
+
+                self.close(scope);
             }
             ExternCrateDeclaration => {
                 let visibility = Visibility::from_item(node, self);
@@ -104,8 +107,6 @@ impl<'a> ScopeAnalyzer<'a> {
                         .unwrap_or_else(|| node.field("name")),
                     node,
                 );
-
-                self.visit_children_except_name(node);
             }
             UseDeclaration => {
                 self.visit_use_declaration(node);
@@ -165,6 +166,28 @@ impl<'a> ScopeAnalyzer<'a> {
             TypeIdentifier => {
                 if is_simple_type_identifier(node) {
                     self.add_reference(get_usage_kind(node), node);
+                }
+            }
+            LetDeclaration => {
+                self.is_in_left_hand_side_of = Some(node);
+                self.visit(node.field("pattern"));
+                self.is_in_left_hand_side_of = None;
+
+                self.visit_children_except_field(node, "pattern");
+            }
+            Identifier => {
+                #[allow(clippy::collapsible_else_if)]
+                if let Some(is_in_left_hand_side_of) = self.is_in_left_hand_side_of {
+                    self.define(
+                        DefinitionKind::Variable,
+                        Visibility::Private,
+                        node,
+                        is_in_left_hand_side_of,
+                    );
+                } else {
+                    if is_simple_identifier(node) {
+                        self.add_reference(get_usage_kind(node), node);
+                    }
                 }
             }
             _ => self.visit_children(node),
@@ -234,8 +257,12 @@ impl<'a> ScopeAnalyzer<'a> {
     }
 
     fn visit_children_except_name(&mut self, node: Node<'a>) {
+        self.visit_children_except_field(node, "name");
+    }
+
+    fn visit_children_except_field(&mut self, node: Node<'a>, field: &str) {
         node.non_comment_children_and_field_names(SupportedLanguage::Rust)
-            .filter(|(_, field_name)| *field_name != Some("name"))
+            .filter(|(_, field_name)| *field_name != Some(field))
             .for_each(|(child, _)| {
                 self.visit(child);
             });
@@ -252,7 +279,7 @@ impl<'a> ScopeAnalyzer<'a> {
             return;
         }
         _Scope::define(
-            self.current_scope_id(),
+            self.current_scope.unwrap(),
             &mut self.arena.scopes,
             &mut self.arena.definitions,
             &mut self.arena.variables,
@@ -270,7 +297,7 @@ impl<'a> ScopeAnalyzer<'a> {
 
     fn close(&mut self, scope: Id<_Scope<'a>>) {
         loop {
-            let current_scope = self.current_scope_id();
+            let current_scope = self.current_scope.unwrap();
             let upper = self.arena.scopes[current_scope].maybe_upper();
 
             trace!(scope = ?current_scope, "closing scope");
@@ -322,6 +349,10 @@ impl<'a> ScopeAnalyzer<'a> {
     pub fn root_scope<'b>(&'b self) -> Scope<'a, 'b> {
         self.borrow_scope(self.scopes[0])
     }
+
+    pub fn scopes<'b>(&'b self) -> impl Iterator<Item = Scope<'a, 'b>> {
+        self.scopes.iter().map(|scope| self.borrow_scope(*scope))
+    }
 }
 
 impl<'a> SourceTextProvider<'a> for ScopeAnalyzer<'a> {
@@ -344,6 +375,10 @@ impl<'a> fmt::Debug for ScopeAnalyzer<'a> {
     }
 }
 
-fn get_usage_kind(_node: Node) -> UsageKind {
-    UsageKind::TypeReference
+fn get_usage_kind(node: Node) -> UsageKind {
+    match node.kind() {
+        TypeIdentifier => UsageKind::TypeReference,
+        Identifier => UsageKind::IdentifierReference,
+        _ => unreachable!()
+    }
 }

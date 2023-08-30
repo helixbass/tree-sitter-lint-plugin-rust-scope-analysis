@@ -19,19 +19,66 @@ pub enum _Scope<'a> {
 }
 
 impl<'a> _Scope<'a> {
-    pub fn new_root(arena: &mut Arena<Self>) -> Id<Self> {
-        arena.alloc_with_id(|id| {
-            Self::Base(ScopeBase {
-                kind: ScopeKind::Root,
+    fn _new(
+        arena: &mut Arena<Self>,
+        kind: ScopeKind,
+        upper: Option<Id<Self>>,
+        node: Node<'a>,
+        create_from_base: impl Fn(ScopeBase<'a>) -> Self,
+    ) -> Id<Self> {
+        let id = arena.alloc_with_id(|id| {
+            create_from_base(ScopeBase {
+                kind,
                 variables: Default::default(),
                 references: Default::default(),
                 pre_resolved: Some(Default::default()),
-                upper: Default::default(),
+                upper,
                 id,
                 name_map: Default::default(),
                 through: Default::default(),
+                node,
+                child_scopes: Default::default(),
             })
-        })
+        });
+
+        if let Some(upper) = upper {
+            arena[upper].child_scopes_mut().push(id);
+        }
+
+        id
+    }
+
+    fn new_base(
+        arena: &mut Arena<Self>,
+        kind: ScopeKind,
+        upper: Option<Id<Self>>,
+        node: Node<'a>,
+    ) -> Id<Self> {
+        Self::_new(
+            arena,
+            kind,
+            upper,
+            node,
+            Self::Base,
+        )
+    }
+
+    pub fn new_root(arena: &mut Arena<Self>, node: Node<'a>) -> Id<Self> {
+        Self::new_base(
+            arena,
+            ScopeKind::Root,
+            Default::default(),
+            node,
+        )
+    }
+
+    pub fn new_function(arena: &mut Arena<Self>, node: Node<'a>, upper: Id<Self>) -> Id<Self> {
+        Self::new_base(
+            arena,
+            ScopeKind::Function,
+            Some(upper),
+            node,
+        )
     }
 
     fn base(&self) -> &ScopeBase<'a> {
@@ -80,6 +127,10 @@ impl<'a> _Scope<'a> {
 
     pub fn through_mut(&mut self) -> &mut Vec<Id<_Reference<'a>>> {
         &mut self.base_mut().through
+    }
+
+    pub fn child_scopes_mut(&mut self) -> &mut Vec<Id<Self>> {
+        &mut self.base_mut().child_scopes
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -259,6 +310,10 @@ impl<'a, 'b> Scope<'a, 'b> {
             .iter()
             .map(|reference| self.scope_analyzer.borrow_reference(*reference))
     }
+
+    pub fn kind(&self) -> ScopeKind {
+        self.scope.base().kind
+    }
 }
 
 pub struct ScopeBase<'a> {
@@ -270,11 +325,14 @@ pub struct ScopeBase<'a> {
     upper: Option<Id<_Scope<'a>>>,
     id: Id<_Scope<'a>>,
     name_map: NameMap<'a>,
+    node: Node<'a>,
+    child_scopes: Vec<Id<_Scope<'a>>>,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum ScopeKind {
     Root,
+    Function,
 }
 
 fn find_resolution<'a>(

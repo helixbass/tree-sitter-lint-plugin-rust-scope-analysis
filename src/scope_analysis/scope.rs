@@ -353,6 +353,12 @@ fn find_resolution<'a>(
                     _ => true,
                 }
             }
+            UsageKind::AttributeName => {
+                matches!(
+                    definition_arena[variable_arena[variable].definition].kind,
+                    DefinitionKind::Use
+                )
+            }
         })
         .copied()
 }

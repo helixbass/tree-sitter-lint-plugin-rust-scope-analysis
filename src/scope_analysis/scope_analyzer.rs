@@ -12,7 +12,7 @@ use tree_sitter_lint::{
 use crate::{
     ast_helpers::{
         get_leading_name_node_of_scoped_identifier, is_enum_variant_name, is_simple_identifier,
-        is_underscore,
+        is_underscore, is_attribute_name,
     },
     kind::{
         ConstItem, EnumItem, ExternCrateDeclaration, FunctionItem, Identifier, LetDeclaration,
@@ -413,7 +413,11 @@ impl<'a> fmt::Debug for ScopeAnalyzer<'a> {
 fn get_usage_kind(node: Node) -> UsageKind {
     match node.kind() {
         TypeIdentifier | ScopedTypeIdentifier | Identifier | ScopedIdentifier => {
-            UsageKind::IdentifierReference
+            if is_attribute_name(node) {
+                UsageKind::AttributeName
+            } else {
+                UsageKind::IdentifierReference
+            }
         }
         _ => unreachable!(),
     }

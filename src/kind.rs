@@ -1,3 +1,4 @@
+pub const Attribute: &str = "attribute";
 pub const BracketedType: &str = "bracketed_type";
 pub const ConstItem: &str = "const_item";
 pub const Crate: &str = "crate";

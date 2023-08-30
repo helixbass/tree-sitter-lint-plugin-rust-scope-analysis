@@ -36,6 +36,7 @@ impl<'a> _Reference<'a> {
 pub enum UsageKind {
     // TypeReference,
     IdentifierReference,
+    AttributeName,
 }
 
 #[derive(Debug)]

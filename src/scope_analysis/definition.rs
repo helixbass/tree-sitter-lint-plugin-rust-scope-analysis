@@ -42,6 +42,13 @@ pub enum DefinitionKind {
     Function,
     ExternCrateDeclaration,
     Use,
+    TypeAlias,
+    Union,
+    Enum,
+    Const,
+    Static,
+    Trait,
+    Macro,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]

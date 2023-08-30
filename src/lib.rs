@@ -1,5 +1,6 @@
 #![allow(non_upper_case_globals)]
 
+mod ast_helpers;
 mod kind;
 mod path;
 mod scope_analysis;

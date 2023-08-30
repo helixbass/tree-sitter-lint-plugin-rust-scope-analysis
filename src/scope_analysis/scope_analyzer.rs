@@ -10,9 +10,11 @@ use tree_sitter_lint::{
 };
 
 use crate::{
+    ast_helpers::is_underscore,
     kind::{
-        ExternCrateDeclaration, FunctionItem, Identifier, ModItem, ScopedIdentifier, SourceFile,
-        StructItem, UseAsClause, UseDeclaration, UseList, VisibilityModifier, ScopedUseList, UseWildcard,
+        ConstItem, EnumItem, ExternCrateDeclaration, FunctionItem, Identifier, ModItem,
+        ScopedIdentifier, ScopedUseList, SourceFile, StaticItem, StructItem, TraitItem, TypeItem,
+        UnionItem, UseAsClause, UseDeclaration, UseList, UseWildcard, VisibilityModifier, MacroDefinition,
     },
     scope_analysis::definition::{DefinitionKind, Visibility},
 };
@@ -97,6 +99,58 @@ impl<'a> ScopeAnalyzer<'a> {
             UseDeclaration => {
                 self.visit_use_declaration(node);
             }
+            TypeItem => {
+                let visibility = Visibility::from_item(node, self);
+                self.define(
+                    DefinitionKind::TypeAlias,
+                    visibility,
+                    node.field("name"),
+                    node,
+                );
+
+                self.visit_children(node);
+            }
+            UnionItem => {
+                let visibility = Visibility::from_item(node, self);
+                self.define(DefinitionKind::Union, visibility, node.field("name"), node);
+
+                self.visit_children(node);
+            }
+            EnumItem => {
+                let visibility = Visibility::from_item(node, self);
+                self.define(DefinitionKind::Enum, visibility, node.field("name"), node);
+
+                self.visit_children(node);
+            }
+            ConstItem => {
+                let visibility = Visibility::from_item(node, self);
+                self.define(DefinitionKind::Const, visibility, node.field("name"), node);
+
+                self.visit_children(node);
+            }
+            StaticItem => {
+                let visibility = Visibility::from_item(node, self);
+                self.define(DefinitionKind::Static, visibility, node.field("name"), node);
+
+                self.visit_children(node);
+            }
+            TraitItem => {
+                let visibility = Visibility::from_item(node, self);
+                self.define(DefinitionKind::Trait, visibility, node.field("name"), node);
+
+                self.visit_children(node);
+            }
+            MacroDefinition => {
+                self.define(
+                    DefinitionKind::Macro,
+                    // TODO: should macros have their own "special" visibility?
+                    Visibility::Pub,
+                    node.field("name"),
+                    node,
+                );
+
+                self.visit_children(node);
+            }
             _ => self.visit_children(node),
         }
     }
@@ -118,12 +172,7 @@ impl<'a> ScopeAnalyzer<'a> {
     ) {
         match use_clause.kind() {
             Identifier => {
-                self.define(
-                    DefinitionKind::Use,
-                    visibility,
-                    use_clause,
-                    use_declaration,
-                );
+                self.define(DefinitionKind::Use, visibility, use_clause, use_declaration);
             }
             ScopedIdentifier => {
                 self.define(
@@ -157,7 +206,7 @@ impl<'a> ScopeAnalyzer<'a> {
                     });
             }
             UseWildcard => (),
-            _ => unreachable!()
+            _ => unreachable!(),
         }
     }
 
@@ -175,6 +224,9 @@ impl<'a> ScopeAnalyzer<'a> {
         name: Node<'a>,
         node: Node<'a>,
     ) {
+        if is_underscore(name, self) {
+            return;
+        }
         _Scope::define(
             self.current_scope_id(),
             &mut self.arena.scopes,

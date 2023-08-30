@@ -99,3 +99,18 @@ fn test_use_list() {
     assert_that!(&variable.references().collect_vec()).is_empty();
     assert_that!(&variables[1].name()).is_equal_to("quux");
 }
+
+#[test]
+fn test_use_as_underscore() {
+    tracing_subscribe();
+
+    let source_text = "
+        use foo::bar as _;
+    ";
+    let tree = parse(source_text);
+    let scope_analyzer = get_scope_analyzer(source_text, &tree);
+
+    let root_scope = scope_analyzer.root_scope();
+
+    assert_that!(&root_scope.variables().collect_vec()).is_empty();
+}

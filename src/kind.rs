@@ -10,6 +10,7 @@ pub const GenericType: &str = "generic_type";
 pub const Identifier: &str = "identifier";
 pub const LetDeclaration: &str = "let_declaration";
 pub const MacroDefinition: &str = "macro_definition";
+pub const MacroInvocation: &str = "macro_invocation";
 pub const Metavariable: &str = "metavariable";
 pub const ModItem: &str = "mod_item";
 pub const QualifiedType: &str = "qualified_type";

@@ -4,7 +4,7 @@ use tree_sitter_lint::{
 
 use crate::kind::{
     BracketedType, EnumVariant, GenericType, Identifier, QualifiedType, ScopedIdentifier,
-    ScopedTypeIdentifier, TypeIdentifier, Attribute,
+    ScopedTypeIdentifier, TypeIdentifier, Attribute, MacroInvocation,
 };
 
 pub fn is_underscore<'a>(
@@ -82,4 +82,21 @@ pub fn is_attribute_name(mut node: Node) -> bool {
         }
         node = parent;
     }
+}
+
+pub fn is_macro_name(mut node: Node) -> bool {
+    loop {
+        let Some(parent) = node.parent() else {
+            return false;
+        };
+        match parent.kind() {
+            MacroInvocation => {
+                return node == parent.field("macro")
+            }
+            Identifier | ScopedIdentifier => (),
+            _ => return false,
+        }
+        node = parent;
+    }
+
 }

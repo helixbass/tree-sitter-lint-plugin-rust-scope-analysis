@@ -359,6 +359,12 @@ fn find_resolution<'a>(
                     DefinitionKind::Use
                 )
             }
+            UsageKind::Macro => {
+                matches!(
+                    definition_arena[variable_arena[variable].definition].kind,
+                    DefinitionKind::Use | DefinitionKind::Macro
+                )
+            }
         })
         .copied()
 }

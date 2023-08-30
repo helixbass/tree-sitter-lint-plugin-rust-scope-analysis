@@ -12,7 +12,7 @@ use tree_sitter_lint::{
 use crate::{
     ast_helpers::{
         get_leading_name_node_of_scoped_identifier, is_enum_variant_name, is_simple_identifier,
-        is_underscore, is_attribute_name,
+        is_underscore, is_attribute_name, is_macro_name,
     },
     kind::{
         ConstItem, EnumItem, ExternCrateDeclaration, FunctionItem, Identifier, LetDeclaration,
@@ -415,6 +415,8 @@ fn get_usage_kind(node: Node) -> UsageKind {
         TypeIdentifier | ScopedTypeIdentifier | Identifier | ScopedIdentifier => {
             if is_attribute_name(node) {
                 UsageKind::AttributeName
+            } else if is_macro_name(node) {
+                UsageKind::Macro
             } else {
                 UsageKind::IdentifierReference
             }

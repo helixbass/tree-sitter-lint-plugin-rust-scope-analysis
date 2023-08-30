@@ -37,6 +37,7 @@ pub enum UsageKind {
     // TypeReference,
     IdentifierReference,
     AttributeName,
+    Macro,
 }
 
 #[derive(Debug)]

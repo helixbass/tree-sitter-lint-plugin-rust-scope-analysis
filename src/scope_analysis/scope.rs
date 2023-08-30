@@ -326,6 +326,7 @@ pub struct ScopeBase<'a> {
     upper: Option<Id<_Scope<'a>>>,
     id: Id<_Scope<'a>>,
     name_map: NameMap<'a>,
+    #[allow(dead_code)]
     node: Node<'a>,
     child_scopes: Vec<Id<_Scope<'a>>>,
 }

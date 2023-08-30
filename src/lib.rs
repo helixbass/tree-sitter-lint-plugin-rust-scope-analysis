@@ -7,4 +7,4 @@ mod scope_analysis;
 #[cfg(test)]
 mod tests;
 
-pub use scope_analysis::ScopeAnalyzer;
+pub use scope_analysis::*;

@@ -3,17 +3,22 @@ use std::{borrow::Cow, fmt, ops};
 use id_arena::Id;
 use tracing::trace;
 use tree_sitter_lint::{
+    better_any::tid,
     tree_sitter::Node,
     tree_sitter_grep::{RopeOrSlice, SupportedLanguage},
-    NodeExt, SourceTextProvider, FromFileRunContext, FileRunContext, better_any::tid,
+    FileRunContext, FromFileRunContext, NodeExt, SourceTextProvider,
 };
 
 use crate::{
-    ast_helpers::{is_simple_type_identifier, is_underscore, is_simple_identifier},
+    ast_helpers::{
+        get_leading_name_node_of_scoped_identifier, is_enum_variant_name, is_simple_identifier,
+        is_underscore,
+    },
     kind::{
-        ConstItem, EnumItem, ExternCrateDeclaration, FunctionItem, Identifier, MacroDefinition,
-        ModItem, ScopedIdentifier, ScopedUseList, SourceFile, StaticItem, StructItem, TraitItem,
-        TypeIdentifier, TypeItem, UnionItem, UseAsClause, UseDeclaration, UseList, UseWildcard, LetDeclaration,
+        ConstItem, EnumItem, ExternCrateDeclaration, FunctionItem, Identifier, LetDeclaration,
+        MacroDefinition, ModItem, ScopedIdentifier, ScopedTypeIdentifier, ScopedUseList,
+        SourceFile, StaticItem, StructItem, TraitItem, TypeIdentifier, TypeItem, UnionItem,
+        UseAsClause, UseDeclaration, UseList, UseWildcard,
     },
     scope_analysis::definition::{DefinitionKind, Visibility},
 };
@@ -91,7 +96,8 @@ impl<'a> ScopeAnalyzer<'a> {
                     node,
                 );
 
-                let scope = _Scope::new_function(&mut self.arena.scopes, node, self.current_scope.unwrap());
+                let scope =
+                    _Scope::new_function(&mut self.arena.scopes, node, self.current_scope.unwrap());
                 self.enter_scope(scope);
 
                 self.visit_children_except_name(node);
@@ -163,10 +169,13 @@ impl<'a> ScopeAnalyzer<'a> {
 
                 self.visit_children_except_name(node);
             }
-            TypeIdentifier => {
-                if is_simple_type_identifier(node) {
-                    self.add_reference(get_usage_kind(node), node);
+            ScopedTypeIdentifier => {
+                if let Some(leading_name_node) = get_leading_name_node_of_scoped_identifier(node) {
+                    self.add_reference(get_usage_kind(node), leading_name_node);
                 }
+            }
+            TypeIdentifier => {
+                self.add_reference(get_usage_kind(node), node);
             }
             LetDeclaration => {
                 self.is_in_left_hand_side_of = Some(node);
@@ -175,7 +184,16 @@ impl<'a> ScopeAnalyzer<'a> {
 
                 self.visit_children_except_field(node, "pattern");
             }
+            ScopedIdentifier => {
+                if let Some(leading_name_node) = get_leading_name_node_of_scoped_identifier(node) {
+                    self.add_reference(get_usage_kind(node), leading_name_node);
+                }
+            }
             Identifier => {
+                if is_enum_variant_name(node) {
+                    return;
+                }
+
                 #[allow(clippy::collapsible_else_if)]
                 if let Some(is_in_left_hand_side_of) = self.is_in_left_hand_side_of {
                     self.define(
@@ -292,7 +310,12 @@ impl<'a> ScopeAnalyzer<'a> {
     }
 
     fn add_reference(&mut self, usage_kind: UsageKind, node: Node<'a>) {
-        current_scope_mut!(self).add_reference(&mut self.arena.references, usage_kind, node, &self.file_contents);
+        current_scope_mut!(self).add_reference(
+            &mut self.arena.references,
+            usage_kind,
+            node,
+            &self.file_contents,
+        );
     }
 
     fn close(&mut self, scope: Id<_Scope<'a>>) {
@@ -389,8 +412,8 @@ impl<'a> fmt::Debug for ScopeAnalyzer<'a> {
 
 fn get_usage_kind(node: Node) -> UsageKind {
     match node.kind() {
-        TypeIdentifier => UsageKind::TypeReference,
-        Identifier => UsageKind::IdentifierReference,
-        _ => unreachable!()
+        TypeIdentifier | ScopedTypeIdentifier => UsageKind::TypeReference,
+        Identifier | ScopedIdentifier => UsageKind::IdentifierReference,
+        _ => unreachable!(),
     }
 }

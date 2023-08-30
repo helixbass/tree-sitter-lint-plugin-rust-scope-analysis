@@ -141,3 +141,48 @@ fn test_reference_in_struct_field_type_gets_resolved() {
     assert_that!(&references[0].resolved()).is_some().is_equal_to(variable_foo);
     assert_that!(&references[0].usage_kind()).is_equal_to(UsageKind::TypeReference);
 }
+
+#[test]
+fn test_enum_variant_doesnt_add_reference() {
+    tracing_subscribe();
+
+    let source_text = "
+        enum Foo {
+            Bar,
+        }
+    ";
+    let tree = parse(source_text);
+    let scope_analyzer = get_scope_analyzer(source_text, &tree);
+
+    let root_scope = scope_analyzer.root_scope();
+
+    assert_that!(&root_scope.variables().collect_vec()).has_length(1);
+    assert_that!(&root_scope.references().collect_vec()).is_empty();
+}
+
+#[test]
+fn test_scoped_path_reference_gets_resolved() {
+    tracing_subscribe();
+
+    let source_text = "
+        enum Foo {
+            Bar,
+        }
+
+        let foo = Foo::Bar;
+    ";
+    let tree = parse(source_text);
+    let scope_analyzer = get_scope_analyzer(source_text, &tree);
+
+    let root_scope = scope_analyzer.root_scope();
+
+    let variables = root_scope.variables().collect_vec();
+    let variable_foo = &variables[0];
+    assert_that!(&variable_foo.name()).is_equal_to("Foo");
+
+    let references = root_scope.references().collect_vec();
+    let references_foo = variable_foo.references().collect_vec();
+
+    assert_that!(&references_foo).has_length(1);
+    assert_that!(&references[0].resolved()).is_some().is_equal_to(variable_foo);
+}

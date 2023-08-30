@@ -54,31 +54,15 @@ impl<'a> _Scope<'a> {
         upper: Option<Id<Self>>,
         node: Node<'a>,
     ) -> Id<Self> {
-        Self::_new(
-            arena,
-            kind,
-            upper,
-            node,
-            Self::Base,
-        )
+        Self::_new(arena, kind, upper, node, Self::Base)
     }
 
     pub fn new_root(arena: &mut Arena<Self>, node: Node<'a>) -> Id<Self> {
-        Self::new_base(
-            arena,
-            ScopeKind::Root,
-            Default::default(),
-            node,
-        )
+        Self::new_base(arena, ScopeKind::Root, Default::default(), node)
     }
 
     pub fn new_function(arena: &mut Arena<Self>, node: Node<'a>, upper: Id<Self>) -> Id<Self> {
-        Self::new_base(
-            arena,
-            ScopeKind::Function,
-            Some(upper),
-            node,
-        )
+        Self::new_base(arena, ScopeKind::Function, Some(upper), node)
     }
 
     fn base(&self) -> &ScopeBase<'a> {
@@ -353,18 +337,22 @@ pub enum ScopeKind {
 }
 
 fn find_resolution<'a>(
-    _variable_arena: &Arena<_Variable<'a>>,
-    _definition_arena: &Arena<_Definition<'a>>,
+    variable_arena: &Arena<_Variable<'a>>,
+    definition_arena: &Arena<_Definition<'a>>,
     scope: Id<_Scope<'a>>,
     variables: &[Id<_Variable<'a>>],
     reference: &_Reference<'a>,
 ) -> Option<Id<_Variable<'a>>> {
-    variables.into_iter().find(|&&_variable| {
-        match reference.usage_kind {
+    variables
+        .into_iter()
+        .find(|&&variable| match reference.usage_kind {
             UsageKind::IdentifierReference => {
-                reference.scope == scope
+                match definition_arena[variable_arena[variable].definition].kind {
+                    DefinitionKind::Variable => reference.scope == scope,
+                    _ => true,
+                }
             }
             _ => true,
-        }
-    }).copied()
+        })
+        .copied()
 }

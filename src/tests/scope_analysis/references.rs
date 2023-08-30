@@ -88,3 +88,26 @@ fn test_reference_in_nested_function_scope_doesnt_get_resolved_to_outer_function
     assert_that(&&*outer_through[0].node().text(&scope_analyzer)).is_equal_to("foo");
     assert_that(&&*inner_through[0].node().text(&scope_analyzer)).is_equal_to("foo");
 }
+
+#[test]
+fn test_reference_in_function_scope_gets_resolved_to_static() {
+    tracing_subscribe();
+
+    let source_text = "
+        static FOO: usize = 0;
+
+        fn whee() -> usize {
+            FOO + 2
+        }
+    ";
+    let tree = parse(source_text);
+    let scope_analyzer = get_scope_analyzer(source_text, &tree);
+
+    let root_scope = scope_analyzer.scopes().next().unwrap();
+    let function_scope = scope_analyzer.scopes().nth(1).unwrap();
+
+    let root_through = root_scope.through().collect_vec();
+    let function_through = function_scope.through().collect_vec();
+    assert_that!(&root_through).is_empty();
+    assert_that!(&function_through).has_length(1);
+}

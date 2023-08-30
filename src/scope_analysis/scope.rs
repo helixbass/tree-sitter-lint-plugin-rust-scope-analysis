@@ -353,7 +353,6 @@ fn find_resolution<'a>(
                     _ => true,
                 }
             }
-            _ => true,
         })
         .copied()
 }

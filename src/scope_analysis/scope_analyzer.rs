@@ -412,8 +412,9 @@ impl<'a> fmt::Debug for ScopeAnalyzer<'a> {
 
 fn get_usage_kind(node: Node) -> UsageKind {
     match node.kind() {
-        TypeIdentifier | ScopedTypeIdentifier => UsageKind::TypeReference,
-        Identifier | ScopedIdentifier => UsageKind::IdentifierReference,
+        TypeIdentifier | ScopedTypeIdentifier | Identifier | ScopedIdentifier => {
+            UsageKind::IdentifierReference
+        }
         _ => unreachable!(),
     }
 }

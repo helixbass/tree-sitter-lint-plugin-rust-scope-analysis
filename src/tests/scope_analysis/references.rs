@@ -30,7 +30,8 @@ fn test_reference_in_type_alias_gets_resolved() {
     let references_foo = variable_foo.references().collect_vec();
     assert_that!(&references_foo).has_length(1);
     assert_that!(&references[0].resolved()).is_some().is_equal_to(variable_foo);
-    assert_that!(&references[0].usage_kind()).is_equal_to(UsageKind::TypeReference);
+    // assert_that!(&references[0].usage_kind()).is_equal_to(UsageKind::TypeReference);
+    assert_that!(&references[0].usage_kind()).is_equal_to(UsageKind::IdentifierReference);
 }
 
 #[test]
@@ -139,7 +140,8 @@ fn test_reference_in_struct_field_type_gets_resolved() {
     assert_that!(&references_foo).has_length(1);
 
     assert_that!(&references[0].resolved()).is_some().is_equal_to(variable_foo);
-    assert_that!(&references[0].usage_kind()).is_equal_to(UsageKind::TypeReference);
+    // assert_that!(&references[0].usage_kind()).is_equal_to(UsageKind::TypeReference);
+    assert_that!(&references[0].usage_kind()).is_equal_to(UsageKind::IdentifierReference);
 }
 
 #[test]

@@ -109,6 +109,10 @@ impl<'a> _Scope<'a> {
         &mut self.base_mut().references
     }
 
+    pub fn pre_resolved(&self) -> &Vec<Id<_Reference<'a>>> {
+        self.base().pre_resolved.as_ref().unwrap()
+    }
+
     pub fn pre_resolved_mut(&mut self) -> &mut Vec<Id<_Reference<'a>>> {
         self.base_mut().pre_resolved.as_mut().unwrap()
     }
@@ -131,6 +135,10 @@ impl<'a> _Scope<'a> {
 
     pub fn child_scopes_mut(&mut self) -> &mut Vec<Id<Self>> {
         &mut self.base_mut().child_scopes
+    }
+
+    pub fn kind(&self) -> ScopeKind {
+        self.base().kind
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -204,7 +212,7 @@ impl<'a> _Scope<'a> {
         source_text_provider: &impl SourceTextProvider<'a>,
     ) {
         #[allow(clippy::unnecessary_to_owned)]
-        for reference in arena[self_].references().to_owned() {
+        for reference in arena[self_].pre_resolved().to_owned() {
             Self::close_reference(
                 self_,
                 arena,
@@ -256,6 +264,7 @@ impl<'a> _Scope<'a> {
         let Some(variable) = find_resolution(
             variable_arena,
             definition_arena,
+            self.id(),
             variables,
             &reference_arena[reference],
         ) else {
@@ -314,6 +323,14 @@ impl<'a, 'b> Scope<'a, 'b> {
     pub fn kind(&self) -> ScopeKind {
         self.scope.base().kind
     }
+
+    pub fn through(&self) -> impl Iterator<Item = Reference<'a, 'b>> + '_ {
+        self.scope
+            .base()
+            .through
+            .iter()
+            .map(|reference| self.scope_analyzer.borrow_reference(*reference))
+    }
 }
 
 pub struct ScopeBase<'a> {
@@ -338,8 +355,16 @@ pub enum ScopeKind {
 fn find_resolution<'a>(
     _variable_arena: &Arena<_Variable<'a>>,
     _definition_arena: &Arena<_Definition<'a>>,
+    scope: Id<_Scope<'a>>,
     variables: &[Id<_Variable<'a>>],
-    _reference: &_Reference<'a>,
+    reference: &_Reference<'a>,
 ) -> Option<Id<_Variable<'a>>> {
-    variables.first().copied()
+    variables.into_iter().find(|&&_variable| {
+        match reference.usage_kind {
+            UsageKind::IdentifierReference => {
+                reference.scope == scope
+            }
+            _ => true,
+        }
+    }).copied()
 }

@@ -261,7 +261,7 @@ impl<'a> ScopeAnalyzer<'a> {
     }
 
     fn visit_children_except_field(&mut self, node: Node<'a>, field: &str) {
-        node.non_comment_children_and_field_names(SupportedLanguage::Rust)
+        node.non_comment_named_children_and_field_names(SupportedLanguage::Rust)
             .filter(|(_, field_name)| *field_name != Some(field))
             .for_each(|(child, _)| {
                 self.visit(child);
@@ -318,7 +318,7 @@ impl<'a> ScopeAnalyzer<'a> {
     }
 
     fn enter_scope(&mut self, scope: Id<_Scope<'a>>) {
-        trace!(?scope, "entering scope");
+        trace!(?scope, kind = ?self.arena.scopes[scope].kind(), "entering scope");
 
         self.scopes.push(scope);
         self.current_scope = Some(scope);

@@ -1,4 +1,4 @@
-#![allow(non_upper_case_globals)]
+#![allow(non_upper_case_globals, clippy::into_iter_on_ref)]
 
 mod ast_helpers;
 mod kind;

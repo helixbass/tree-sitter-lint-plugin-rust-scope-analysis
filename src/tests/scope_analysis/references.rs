@@ -111,3 +111,33 @@ fn test_reference_in_function_scope_gets_resolved_to_static() {
     assert_that!(&root_through).is_empty();
     assert_that!(&function_through).has_length(1);
 }
+
+#[test]
+fn test_reference_in_struct_field_type_gets_resolved() {
+    tracing_subscribe();
+
+    let source_text = "
+        struct Foo {}
+
+        struct Bar {
+            foo: Foo,
+        }
+    ";
+    let tree = parse(source_text);
+    let scope_analyzer = get_scope_analyzer(source_text, &tree);
+
+    let root_scope = scope_analyzer.root_scope();
+
+    let variables = root_scope.variables().collect_vec();
+    let variable_foo = &variables[0];
+    assert_that!(&variable_foo.name()).is_equal_to("Foo");
+
+    let references = root_scope.references().collect_vec();
+    assert_that!(&references).has_length(1);
+
+    let references_foo = variable_foo.references().collect_vec();
+    assert_that!(&references_foo).has_length(1);
+
+    assert_that!(&references[0].resolved()).is_some().is_equal_to(variable_foo);
+    assert_that!(&references[0].usage_kind()).is_equal_to(UsageKind::TypeReference);
+}

@@ -5,7 +5,7 @@ use tracing::trace;
 use tree_sitter_lint::{
     tree_sitter::Node,
     tree_sitter_grep::{RopeOrSlice, SupportedLanguage},
-    NodeExt, SourceTextProvider,
+    NodeExt, SourceTextProvider, FromFileRunContext, FileRunContext, better_any::tid,
 };
 
 use crate::{
@@ -364,6 +364,18 @@ impl<'a> SourceTextProvider<'a> for ScopeAnalyzer<'a> {
         self.file_contents.slice(range)
     }
 }
+
+impl<'a> FromFileRunContext<'a> for ScopeAnalyzer<'a> {
+    fn from_file_run_context(file_run_context: FileRunContext<'a, '_>) -> Self {
+        let mut scope_analyzer = Self::new(file_run_context.file_contents);
+
+        scope_analyzer.visit(file_run_context.tree.root_node());
+
+        scope_analyzer
+    }
+}
+
+tid! { impl<'a> TidAble<'a> for ScopeAnalyzer<'a> }
 
 impl<'a> fmt::Debug for ScopeAnalyzer<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

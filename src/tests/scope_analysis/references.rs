@@ -240,3 +240,29 @@ fn test_macro_reference_gets_resolved() {
     assert_that!(&references_bar).has_length(1);
     assert_that!(&references_bar[0].usage_kind()).is_equal_to(UsageKind::Macro);
 }
+
+#[test]
+fn test_reference_in_turbofish_type_gets_resolved() {
+    tracing_subscribe();
+
+    let source_text = "
+        use foo::Bar;
+
+        fn whee() {
+            SkipOptionsBuilder::<fn(Bar) -> bool>::default();
+        }
+    ";
+    let tree = parse(source_text);
+    let scope_analyzer = get_scope_analyzer(source_text, &tree);
+
+    let root_scope = scope_analyzer.root_scope();
+
+    let variables = root_scope.variables().collect_vec();
+    let variable_bar = &variables[0];
+    assert_that!(&variable_bar.name()).is_equal_to("Bar");
+
+    let references_bar = variable_bar.references().collect_vec();
+
+    assert_that!(&references_bar).has_length(1);
+    assert_that!(&references_bar[0].usage_kind()).is_equal_to(UsageKind::IdentifierReference);
+}

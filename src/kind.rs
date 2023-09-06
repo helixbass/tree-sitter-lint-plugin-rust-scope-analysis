@@ -1,3 +1,5 @@
+pub type Kind = &'static str;
+
 pub const Attribute: &str = "attribute";
 pub const BracketedType: &str = "bracketed_type";
 pub const ConstItem: &str = "const_item";
@@ -23,6 +25,7 @@ pub const StaticItem: &str = "static_item";
 pub const StructItem: &str = "struct_item";
 pub const Super: &str = "super";
 pub const TraitItem: &str = "trait_item";
+pub const TypeArguments: &str = "type_arguments";
 pub const TypeIdentifier: &str = "type_identifier";
 pub const TypeItem: &str = "type_item";
 pub const UnionItem: &str = "union_item";

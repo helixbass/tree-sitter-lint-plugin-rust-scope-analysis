@@ -18,7 +18,7 @@ use crate::{
         ConstItem, EnumItem, ExternCrateDeclaration, FunctionItem, Identifier, LetDeclaration,
         MacroDefinition, ModItem, ScopedIdentifier, ScopedTypeIdentifier, ScopedUseList,
         SourceFile, StaticItem, StructItem, TraitItem, TypeIdentifier, TypeItem, UnionItem,
-        UseAsClause, UseDeclaration, UseList, UseWildcard,
+        UseAsClause, UseDeclaration, UseList, UseWildcard, self, TypeArguments, Kind,
     },
     scope_analysis::definition::{DefinitionKind, Visibility},
 };
@@ -43,6 +43,7 @@ pub struct ScopeAnalyzer<'a> {
     arena: AllArenas<'a>,
     current_scope: Option<Id<_Scope<'a>>>,
     is_in_left_hand_side_of: Option<Node<'a>>,
+    visiting_descendants_of_kind: Option<Kind>,
 }
 
 impl<'a> ScopeAnalyzer<'a> {
@@ -55,6 +56,7 @@ impl<'a> ScopeAnalyzer<'a> {
             arena: Default::default(),
             current_scope: Default::default(),
             is_in_left_hand_side_of: Default::default(),
+            visiting_descendants_of_kind: Default::default(),
         }
     }
 
@@ -65,6 +67,21 @@ impl<'a> ScopeAnalyzer<'a> {
 
     pub fn visit(&mut self, node: Node<'a>) {
         trace!(?node, "visiting node");
+
+        let mut saved_visiting_descendants_of_kind: Option<Kind> = None;
+        if let Some(visiting_descendants_of_kind) = self.visiting_descendants_of_kind {
+            if node.kind() == visiting_descendants_of_kind {
+                trace!(kind = ?visiting_descendants_of_kind, "descending into descendant of kind");
+
+                saved_visiting_descendants_of_kind = Some(visiting_descendants_of_kind);
+                self.visiting_descendants_of_kind = None;
+            } else {
+                trace!(kind = ?visiting_descendants_of_kind, "just visiting children because not of kind");
+
+                self.visit_children(node);
+                return;
+            }
+        }
 
         match node.kind() {
             SourceFile => {
@@ -188,6 +205,8 @@ impl<'a> ScopeAnalyzer<'a> {
                 if let Some(leading_name_node) = get_leading_name_node_of_scoped_identifier(node) {
                     self.add_reference(get_usage_kind(node), leading_name_node);
                 }
+
+                self.visit_descendants_of_kind(node, TypeArguments);
             }
             Identifier => {
                 if is_enum_variant_name(node) {
@@ -209,6 +228,10 @@ impl<'a> ScopeAnalyzer<'a> {
                 }
             }
             _ => self.visit_children(node),
+        }
+
+        if let Some(saved_visiting_descendants_of_kind) = saved_visiting_descendants_of_kind {
+            self.visiting_descendants_of_kind = Some(saved_visiting_descendants_of_kind);
         }
     }
 
@@ -262,8 +285,8 @@ impl<'a> ScopeAnalyzer<'a> {
                         self.visit_use_clause(visibility.clone(), use_declaration, use_clause);
                     });
             }
-            UseWildcard => (),
-            _ => unreachable!(),
+            UseWildcard | kind::Self_ => (),
+            x => unreachable!("{x}"),
         }
     }
 
@@ -284,6 +307,12 @@ impl<'a> ScopeAnalyzer<'a> {
             .for_each(|(child, _)| {
                 self.visit(child);
             });
+    }
+
+    fn visit_descendants_of_kind(&mut self, node: Node<'a>, kind: Kind) {
+        self.visiting_descendants_of_kind = Some(kind);
+        self.visit_children(node);
+        self.visiting_descendants_of_kind = None;
     }
 
     fn define(

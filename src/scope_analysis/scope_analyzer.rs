@@ -18,7 +18,7 @@ use crate::{
         ConstItem, EnumItem, ExternCrateDeclaration, FunctionItem, Identifier, LetDeclaration,
         MacroDefinition, ModItem, ScopedIdentifier, ScopedTypeIdentifier, ScopedUseList,
         SourceFile, StaticItem, StructItem, TraitItem, TypeIdentifier, TypeItem, UnionItem,
-        UseAsClause, UseDeclaration, UseList, UseWildcard, TypeArguments, Kind, Self_,
+        UseAsClause, UseDeclaration, UseList, UseWildcard, TypeArguments, Kind, Self_, ArrowSeparatedPair,
     },
     scope_analysis::definition::{DefinitionKind, Visibility},
 };
@@ -226,6 +226,9 @@ impl<'a> ScopeAnalyzer<'a> {
                         self.add_reference(get_usage_kind(node), node);
                     }
                 }
+            }
+            ArrowSeparatedPair => {
+                self.visit_children_except_field(node, "key");
             }
             _ => self.visit_children(node),
         }

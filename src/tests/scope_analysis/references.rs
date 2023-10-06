@@ -290,3 +290,24 @@ fn test_reference_to_use_self_gets_resolved() {
     assert_that!(&references_bar).has_length(1);
     assert_that!(&references_bar[0].usage_kind()).is_equal_to(UsageKind::IdentifierReference);
 }
+
+#[test]
+fn test_key_of_arrow_separated_pair_doesnt_get_treated_like_a_reference() {
+    tracing_subscribe();
+
+    let source_text = "
+        use foo::something;
+
+        something! {
+            bar => 3,
+        }
+    ";
+    let tree = parse(source_text);
+    let scope_analyzer = get_scope_analyzer(source_text, &tree);
+
+    let root_scope = scope_analyzer.root_scope();
+
+    let references = root_scope.references().collect_vec();
+    assert_that!(&references).has_length(1);
+    assert_that(&&*references[0].node().text(&scope_analyzer)).is_equal_to("something");
+}

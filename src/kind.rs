@@ -1,5 +1,6 @@
 pub type Kind = &'static str;
 
+pub const ArrowSeparatedPair: &str = "arrow_separated_pair";
 pub const Attribute: &str = "attribute";
 pub const BracketedType: &str = "bracketed_type";
 pub const ConstItem: &str = "const_item";

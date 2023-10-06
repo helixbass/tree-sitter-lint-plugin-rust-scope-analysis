@@ -18,7 +18,7 @@ use crate::{
         ConstItem, EnumItem, ExternCrateDeclaration, FunctionItem, Identifier, LetDeclaration,
         MacroDefinition, ModItem, ScopedIdentifier, ScopedTypeIdentifier, ScopedUseList,
         SourceFile, StaticItem, StructItem, TraitItem, TypeIdentifier, TypeItem, UnionItem,
-        UseAsClause, UseDeclaration, UseList, UseWildcard, self, TypeArguments, Kind,
+        UseAsClause, UseDeclaration, UseList, UseWildcard, TypeArguments, Kind, Self_,
     },
     scope_analysis::definition::{DefinitionKind, Visibility},
 };
@@ -254,6 +254,26 @@ impl<'a> ScopeAnalyzer<'a> {
             Identifier => {
                 self.define(DefinitionKind::Use, visibility, use_clause, use_declaration);
             }
+            Self_ => {
+                let parent = use_clause.parent().unwrap();
+                if parent.kind() != UseList {
+                    return;
+                }
+                let parent_parent = parent.parent().unwrap();
+                if parent_parent.kind() != ScopedUseList {
+                    return;
+                }
+                let Some(preceding_path) = parent_parent.child_by_field_name("path") else {
+                    return;
+                };
+
+                let preceding_identifier = match preceding_path.kind() {
+                    Identifier => preceding_path,
+                    ScopedIdentifier => preceding_path.field("name"),
+                    _ => unreachable!(),
+                };
+                self.define(DefinitionKind::Use, visibility, preceding_identifier, use_declaration);
+            }
             ScopedIdentifier => {
                 self.define(
                     DefinitionKind::Use,
@@ -285,7 +305,7 @@ impl<'a> ScopeAnalyzer<'a> {
                         self.visit_use_clause(visibility.clone(), use_declaration, use_clause);
                     });
             }
-            UseWildcard | kind::Self_ => (),
+            UseWildcard => (),
             x => unreachable!("{x}"),
         }
     }

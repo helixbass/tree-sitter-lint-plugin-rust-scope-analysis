@@ -114,3 +114,25 @@ fn test_use_as_underscore() {
 
     assert_that!(&root_scope.variables().collect_vec()).is_empty();
 }
+
+#[test]
+fn test_use_self() {
+    tracing_subscribe();
+
+    let source_text = "
+        use foo::{self};
+    ";
+    let tree = parse(source_text);
+    let scope_analyzer = get_scope_analyzer(source_text, &tree);
+
+    let root_scope = scope_analyzer.root_scope();
+
+    let variables = root_scope.variables().collect_vec();
+    assert_that!(&variables).has_length(1);
+    let variable = &variables[0];
+    assert_that!(&variable.definition().kind()).is_equal_to(DefinitionKind::Use);
+    assert_that!(&variable.name()).is_equal_to("foo");
+    assert_that!(&variable.definition().name().kind()).is_equal_to(Identifier);
+    assert_that!(&variable.definition().node().kind()).is_equal_to(UseDeclaration);
+    assert_that!(&variable.references().collect_vec()).is_empty();
+}

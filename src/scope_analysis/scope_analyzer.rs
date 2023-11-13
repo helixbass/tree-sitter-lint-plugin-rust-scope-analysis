@@ -102,7 +102,13 @@ impl<'a> ScopeAnalyzer<'a> {
                 let visibility = Visibility::from_item(node, self);
                 self.define(DefinitionKind::Module, visibility, node.field("name"), node);
 
+                let scope =
+                    _Scope::new_module(&mut self.arena.scopes, node, self.current_scope.unwrap());
+                self.enter_scope(scope);
+
                 self.visit_children_except_name(node);
+
+                self.close(scope);
             }
             FunctionItem => {
                 let visibility = Visibility::from_item(node, self);

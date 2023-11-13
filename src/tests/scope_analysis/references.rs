@@ -311,3 +311,59 @@ fn test_key_of_arrow_separated_pair_doesnt_get_treated_like_a_reference() {
     assert_that!(&references).has_length(1);
     assert_that(&&*references[0].node().text(&scope_analyzer)).is_equal_to("something");
 }
+
+#[test]
+fn test_reference_to_shadowed_nested_import_gets_resolved() {
+    tracing_subscribe();
+
+    let source_text = "
+        use foo::Bar;
+
+        mod baz {
+            use foo::Bar;
+
+            let x: Bar;
+        }
+    ";
+    let tree = parse(source_text);
+    let scope_analyzer = get_scope_analyzer(source_text, &tree);
+
+    let root_scope = scope_analyzer.scopes().next().unwrap();
+    let module_scope = scope_analyzer.scopes().nth(1).unwrap();
+
+    let variables = root_scope.variables().collect_vec();
+    assert_that!(&variables).has_length(2);
+    let variable_bar = &variables[0];
+    assert_that!(&variable_bar.references().collect_vec()).is_empty();
+
+    let variables = module_scope.variables().collect_vec();
+    assert_that!(&variables).has_length(2);
+    let variable_bar = &variables[0];
+    let references_bar = variable_bar.references().collect_vec();
+    assert_that!(&references_bar).has_length(1);
+    assert_that!(&references_bar[0].resolved()).is_some().is_equal_to(variable_bar);
+}
+
+#[test]
+fn test_reference_to_outer_import_from_nested_module_gets_resolved() {
+    tracing_subscribe();
+
+    let source_text = "
+        use foo::Bar;
+
+        mod baz {
+            let x: Bar;
+        }
+    ";
+    let tree = parse(source_text);
+    let scope_analyzer = get_scope_analyzer(source_text, &tree);
+
+    let root_scope = scope_analyzer.scopes().next().unwrap();
+
+    let variables = root_scope.variables().collect_vec();
+    assert_that!(&variables).has_length(2);
+    let variable_bar = &variables[0];
+    let references_bar = variable_bar.references().collect_vec();
+    assert_that!(&references_bar).has_length(1);
+    assert_that!(&references_bar[0].resolved()).is_some().is_equal_to(variable_bar);
+}

@@ -65,6 +65,10 @@ impl<'a> _Scope<'a> {
         Self::new_base(arena, ScopeKind::Function, Some(upper), node)
     }
 
+    pub fn new_module(arena: &mut Arena<Self>, node: Node<'a>, upper: Id<Self>) -> Id<Self> {
+        Self::new_base(arena, ScopeKind::Module, Some(upper), node)
+    }
+
     fn base(&self) -> &ScopeBase<'a> {
         match self {
             _Scope::Base(value) => value,
@@ -335,6 +339,7 @@ pub struct ScopeBase<'a> {
 pub enum ScopeKind {
     Root,
     Function,
+    Module,
 }
 
 fn find_resolution<'a>(

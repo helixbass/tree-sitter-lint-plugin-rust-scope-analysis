@@ -6,7 +6,7 @@ use crate::scope_analysis::ScopeAnalyzer;
 
 pub fn parse(source_text: &str) -> Tree {
     let mut parser = Parser::new();
-    parser.set_language(SupportedLanguage::Rust.language()).unwrap();
+    parser.set_language(SupportedLanguage::Rust.language(None)).unwrap();
 
     parser.parse(source_text, None).unwrap()
 }

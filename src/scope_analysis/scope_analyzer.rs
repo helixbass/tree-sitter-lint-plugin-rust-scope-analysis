@@ -18,7 +18,7 @@ use crate::{
         ConstItem, EnumItem, ExternCrateDeclaration, FunctionItem, Identifier, LetDeclaration,
         MacroDefinition, ModItem, ScopedIdentifier, ScopedTypeIdentifier, ScopedUseList,
         SourceFile, StaticItem, StructItem, TraitItem, TypeIdentifier, TypeItem, UnionItem,
-        UseAsClause, UseDeclaration, UseList, UseWildcard, TypeArguments, Kind, Self_, ArrowSeparatedPair,
+        UseAsClause, UseDeclaration, UseList, UseWildcard, TypeArguments, Kind, Self_, ArrowSeparatedPair, Crate,
     },
     scope_analysis::definition::{DefinitionKind, Visibility},
 };
@@ -279,6 +279,7 @@ impl<'a> ScopeAnalyzer<'a> {
                 let preceding_identifier = match preceding_path.kind() {
                     Identifier => preceding_path,
                     ScopedIdentifier => preceding_path.field("name"),
+                    Crate => return,
                     _ => unreachable!(),
                 };
                 self.define(DefinitionKind::Use, visibility, preceding_identifier, use_declaration);
